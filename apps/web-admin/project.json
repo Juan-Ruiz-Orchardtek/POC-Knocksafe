@@ -1,0 +1,23 @@
+{
+  "name": "web-admin",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/web-admin",
+  "projectType": "application",
+  "tags": ["scope:frontend", "type:app"],
+  "targets": {
+    "dev": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/web-admin",
+        "command": "next dev --port 4201"
+      }
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/web-admin",
+        "command": "next dev --port 4201"
+      }
+    }
+  }
+}

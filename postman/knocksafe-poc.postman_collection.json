@@ -1,0 +1,313 @@
+{
+  "info": {
+    "name": "Knocksafe POC",
+    "_postman_id": "knocksafe-poc-collection",
+    "description": "Collection to test auth, organizations and reps microservices independently.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "authBaseUrl", "value": "http://localhost:3001" },
+    { "key": "orgsBaseUrl", "value": "http://localhost:3002" },
+    { "key": "repsBaseUrl", "value": "http://localhost:3003" },
+    { "key": "adminToken", "value": "" },
+    { "key": "repToken", "value": "" },
+    { "key": "organizationId", "value": "" },
+    { "key": "repId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth Service",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{authBaseUrl}}/health"
+          }
+        },
+        {
+          "name": "Admin Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.accessToken) {",
+                  "  pm.collectionVariables.set('adminToken', json.accessToken);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@knocksafe.com\",\n  \"password\": \"Admin123!\"\n}"
+            },
+            "url": "{{authBaseUrl}}/auth/admin/login"
+          }
+        },
+        {
+          "name": "Rep Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.accessToken) {",
+                  "  pm.collectionVariables.set('repToken', json.accessToken);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"rep@knocksafe.com\",\n  \"password\": \"Rep123!\"\n}"
+            },
+            "url": "{{authBaseUrl}}/auth/rep/login"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Organizations Service",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{orgsBaseUrl}}/health"
+          }
+        },
+        {
+          "name": "List Organizations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{orgsBaseUrl}}/organizations"
+          }
+        },
+        {
+          "name": "Create Organization",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.id) {",
+                  "  pm.collectionVariables.set('organizationId', json.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"New Organization POC\"\n}"
+            },
+            "url": "{{orgsBaseUrl}}/organizations"
+          }
+        },
+        {
+          "name": "Get Organization By Id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{orgsBaseUrl}}/organizations/{{organizationId}}"
+          }
+        },
+        {
+          "name": "Update Organization",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Organization POC\"\n}"
+            },
+            "url": "{{orgsBaseUrl}}/organizations/{{organizationId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reps Service",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{repsBaseUrl}}/health"
+          }
+        },
+        {
+          "name": "List Reps (admin)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{repsBaseUrl}}/reps"
+          }
+        },
+        {
+          "name": "Create Rep (admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.id) {",
+                  "  pm.collectionVariables.set('repId', json.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organizationId\": \"{{organizationId}}\",\n  \"email\": \"newrep@knocksafe.com\",\n  \"password\": \"Rep123!\",\n  \"firstName\": \"New\",\n  \"lastName\": \"Rep\",\n  \"phone\": \"+34 600 000 002\"\n}"
+            },
+            "url": "{{repsBaseUrl}}/reps"
+          }
+        },
+        {
+          "name": "Get Rep By Id (admin)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{repsBaseUrl}}/reps/{{repId}}"
+          }
+        },
+        {
+          "name": "My Profile (rep)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{repToken}}" }],
+            "url": "{{repsBaseUrl}}/reps/me"
+          }
+        },
+        {
+          "name": "Update Rep (admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+34 600 000 999\"\n}"
+            },
+            "url": "{{repsBaseUrl}}/reps/{{repId}}"
+          }
+        },
+        {
+          "name": "Delete Rep (admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{repsBaseUrl}}/reps/{{repId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Suggested Flow",
+      "item": [
+        {
+          "name": "1. Admin Login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@knocksafe.com\",\n  \"password\": \"Admin123!\"\n}"
+            },
+            "url": "{{authBaseUrl}}/auth/admin/login"
+          }
+        },
+        {
+          "name": "2. Create Organization",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Flow Test Org\"\n}"
+            },
+            "url": "{{orgsBaseUrl}}/organizations"
+          }
+        },
+        {
+          "name": "3. Create Rep",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organizationId\": \"{{organizationId}}\",\n  \"email\": \"flowrep@knocksafe.com\",\n  \"password\": \"Rep123!\",\n  \"firstName\": \"Flow\",\n  \"lastName\": \"Rep\",\n  \"phone\": \"+34 600 000 003\"\n}"
+            },
+            "url": "{{repsBaseUrl}}/reps"
+          }
+        },
+        {
+          "name": "4. Rep Login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"flowrep@knocksafe.com\",\n  \"password\": \"Rep123!\"\n}"
+            },
+            "url": "{{authBaseUrl}}/auth/rep/login"
+          }
+        },
+        {
+          "name": "5. Rep Profile",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{repToken}}" }],
+            "url": "{{repsBaseUrl}}/reps/me"
+          }
+        }
+      ]
+    }
+  ]
+}

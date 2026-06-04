@@ -1,0 +1,122 @@
+# Default: backends connect to MySQL on the host (your local instance).
+# Optional MySQL container: docker compose --profile docker-db up -d
+
+services:
+  mysql:
+    profiles: [docker-db]
+    image: mysql:8.4
+    container_name: knocksafe-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: knocksafe
+      MYSQL_USER: knocksafe
+      MYSQL_PASSWORD: knocksafe
+    ports:
+      - '3306:3306'
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-uknocksafe', '-pknocksafe']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: apps/auth-service/Dockerfile
+    container_name: knocksafe-auth
+    restart: unless-stopped
+    environment:
+      PORT: 3001
+      DB_HOST: host.docker.internal
+      DB_PORT: 3306
+      DB_USER: ${DB_USER:-root}
+      DB_PASSWORD: ${DB_PASSWORD:-}
+      DB_NAME: ${DB_NAME:-knocksafe}
+      DB_SYNC: 'true'
+      JWT_SECRET: knocksafe-poc-dev-secret-change-in-prod
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    ports:
+      - '3001:3001'
+
+  organizations-service:
+    build:
+      context: .
+      dockerfile: apps/organizations-service/Dockerfile
+    container_name: knocksafe-orgs
+    restart: unless-stopped
+    environment:
+      PORT: 3002
+      DB_HOST: host.docker.internal
+      DB_PORT: 3306
+      DB_USER: ${DB_USER:-root}
+      DB_PASSWORD: ${DB_PASSWORD:-}
+      DB_NAME: ${DB_NAME:-knocksafe}
+      DB_SYNC: 'true'
+      JWT_SECRET: knocksafe-poc-dev-secret-change-in-prod
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    ports:
+      - '3002:3002'
+
+  reps-service:
+    build:
+      context: .
+      dockerfile: apps/reps-service/Dockerfile
+    container_name: knocksafe-reps
+    restart: unless-stopped
+    depends_on:
+      - organizations-service
+    environment:
+      PORT: 3003
+      DB_HOST: host.docker.internal
+      DB_PORT: 3306
+      DB_USER: ${DB_USER:-root}
+      DB_PASSWORD: ${DB_PASSWORD:-}
+      DB_NAME: ${DB_NAME:-knocksafe}
+      DB_SYNC: 'true'
+      JWT_SECRET: knocksafe-poc-dev-secret-change-in-prod
+      ORGANIZATIONS_SERVICE_URL: http://organizations-service:3002
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    ports:
+      - '3003:3003'
+
+  web-client:
+    build:
+      context: .
+      dockerfile: apps/web-client/Dockerfile
+    container_name: knocksafe-web-client
+    restart: unless-stopped
+    depends_on:
+      - auth-service
+      - reps-service
+    environment:
+      NEXT_PUBLIC_AUTH_SERVICE_URL: http://localhost:3001
+      NEXT_PUBLIC_REPS_SERVICE_URL: http://localhost:3003
+    ports:
+      - '4200:4200'
+
+  web-admin:
+    build:
+      context: .
+      dockerfile: apps/web-admin/Dockerfile
+    container_name: knocksafe-web-admin
+    restart: unless-stopped
+    depends_on:
+      - auth-service
+      - organizations-service
+      - reps-service
+    environment:
+      NEXT_PUBLIC_AUTH_SERVICE_URL: http://localhost:3001
+      NEXT_PUBLIC_ORGS_SERVICE_URL: http://localhost:3002
+      NEXT_PUBLIC_REPS_SERVICE_URL: http://localhost:3003
+    ports:
+      - '4201:4201'
+
+volumes:
+  mysql_data:

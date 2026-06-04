@@ -1,0 +1,27 @@
+{
+  "compileOnSave": false,
+  "compilerOptions": {
+    "rootDir": ".",
+    "sourceMap": true,
+    "declaration": false,
+    "moduleResolution": "node",
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "importHelpers": true,
+    "target": "es2022",
+    "module": "esnext",
+    "lib": ["es2022", "dom"],
+    "skipLibCheck": true,
+    "skipDefaultLibCheck": true,
+    "baseUrl": ".",
+    "strict": true,
+    "paths": {
+      "@knocksafe/shared/types": ["libs/shared/types/src/index.ts"],
+      "@knocksafe/shared/dto": ["libs/shared/dto/src/index.ts"],
+      "@knocksafe/shared/database": ["libs/shared/database/src/index.ts"],
+      "@knocksafe/shared/auth": ["libs/shared/auth/src/index.ts"],
+      "@knocksafe/ui/components": ["libs/ui/components/src/index.ts"]
+    }
+  },
+  "exclude": ["node_modules", "tmp"]
+}
