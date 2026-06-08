@@ -69,7 +69,7 @@ export class RepEntity {
   @Column({ name: 'last_name', length: 100 })
   lastName!: string;
 
-  @Column({ length: 50, nullable: true })
+  @Column({ type: 'varchar', length: 50, nullable: true })
   phone!: string | null;
 
   @CreateDateColumn({ name: 'created_at' })

@@ -1,0 +1,511 @@
+@startuml Knocksafe Data Model
+
+!theme plain
+skinparam linetype ortho
+skinparam classAttributeIconSize 0
+skinparam classFontSize 12
+skinparam classAttributeFontSize 10
+
+hide circle
+hide methods
+
+' ============================================================
+' CORE ENTITIES
+' ============================================================
+
+package "Core" {
+
+  entity "organizations" as orgs {
+    * id : UUID <<PK>>
+    --
+    * name : VARCHAR(255)
+    * slug : VARCHAR(100) <<UNIQUE>>
+    * status : ENUM {trial, active, suspended}
+      settings : JSONB
+    --
+    * created_at : TIMESTAMPTZ
+      created_by : UUID <<FK users>>
+    * updated_at : TIMESTAMPTZ
+      updated_by : UUID <<FK users>>
+      deleted_at : TIMESTAMPTZ
+      deleted_by : UUID <<FK users>>
+  }
+
+  entity "users" as users {
+    * id : UUID <<PK>>
+    --
+    * email : VARCHAR(255) <<UNIQUE>>
+      password_hash : VARCHAR(255)
+    * first_name : VARCHAR(100)
+    * last_name : VARCHAR(100)
+      phone : VARCHAR(50)
+      avatar_url : TEXT
+    * status : ENUM {active, inactive, suspended}
+      last_login_at : TIMESTAMPTZ
+    --
+    * created_at : TIMESTAMPTZ
+      created_by : UUID <<FK users>>
+    * updated_at : TIMESTAMPTZ
+      updated_by : UUID <<FK users>>
+      deleted_at : TIMESTAMPTZ
+      deleted_by : UUID <<FK users>>
+  }
+
+}
+
+' ============================================================
+' RBAC
+' ============================================================
+
+package "RBAC" {
+
+  entity "roles" as roles {
+    * id : UUID <<PK>>
+    --
+      org_id : UUID <<FK organizations>>
+    * name : VARCHAR(50)
+    * display_name : VARCHAR(100)
+      description : TEXT
+    * is_system : BOOLEAN
+    --
+    <<UNIQUE(org_id, name)>>
+    --
+    * created_at : TIMESTAMPTZ
+      created_by : UUID <<FK users>>
+    * updated_at : TIMESTAMPTZ
+      updated_by : UUID <<FK users>>
+      deleted_at : TIMESTAMPTZ
+      deleted_by : UUID <<FK users>>
+  }
+
+  entity "role_permissions" as role_perms {
+    * id : UUID <<PK>>
+    --
+    * role_id : UUID <<FK roles>>
+    * permission : VARCHAR(100)
+    --
+    <<UNIQUE(role_id, permission)>>
+    --
+    * created_at : TIMESTAMPTZ
+      created_by : UUID <<FK users>>
+  }
+
+  entity "org_members" as members {
+    * id : UUID <<PK>>
+    --
+    * user_id : UUID <<FK users>>
+    * org_id : UUID <<FK organizations>>
+    * role_id : UUID <<FK roles>>
+    * joined_at : TIMESTAMPTZ
+    --
+    <<UNIQUE(user_id, org_id, role_id)>>
+    --
+    * created_at : TIMESTAMPTZ
+      created_by : UUID <<FK users>>
+    * updated_at : TIMESTAMPTZ
+      updated_by : UUID <<FK users>>
+      deleted_at : TIMESTAMPTZ
+      deleted_by : UUID <<FK users>>
+  }
+
+}
+
+' ============================================================
+' PLAUD INTEGRATION
+' ============================================================
+
+package "Plaud Integration" {
+
+  entity "devices" as devices {
+    * id : UUID <<PK>>
+    --
+    * org_id : UUID <<FK organizations>>
+      assigned_to : UUID <<FK users>>
+    * serial_number : VARCHAR(100) <<UNIQUE>>
+      nickname : VARCHAR(100)
+    * device_type : VARCHAR(50)
+    * status : ENUM {active, unassigned, decommissioned}
+      last_seen_at : TIMESTAMPTZ
+    --
+    * created_at : TIMESTAMPTZ
+      created_by : UUID <<FK users>>
+    * updated_at : TIMESTAMPTZ
+      updated_by : UUID <<FK users>>
+      deleted_at : TIMESTAMPTZ
+      deleted_by : UUID <<FK users>>
+  }
+
+  entity "plaud_accounts" as plaud_acc {
+    * id : UUID <<PK>>
+    --
+    * org_id : UUID <<FK organizations>>
+      rep_id : UUID <<FK users>>
+      plaud_user_id : VARCHAR(100)
+    * label : VARCHAR(100)
+    * access_token : TEXT
+    * refresh_token : TEXT
+    * token_expires_at : TIMESTAMPTZ
+      last_synced_at : TIMESTAMPTZ
+    --
+    * created_at : TIMESTAMPTZ
+      created_by : UUID <<FK users>>
+    * updated_at : TIMESTAMPTZ
+      updated_by : UUID <<FK users>>
+      deleted_at : TIMESTAMPTZ
+      deleted_by : UUID <<FK users>>
+  }
+
+  entity "plaud_synced_files" as synced {
+    * id : UUID <<PK>>
+    --
+    * plaud_account_id : UUID <<FK plaud_accounts>>
+    * plaud_file_id : VARCHAR(100) <<UNIQUE>>
+      rep_id : UUID <<FK users>>
+    * synced_at : TIMESTAMPTZ
+  }
+
+}
+
+' ============================================================
+' RECORDINGS & TRANSCRIPTS
+' ============================================================
+
+package "Recordings" {
+
+  entity "recordings" as recs {
+    * id : UUID <<PK>>
+    --
+    * org_id : UUID <<FK organizations>>
+    * rep_id : UUID <<FK users>>
+      device_id : UUID <<FK devices>>
+      plaud_file_id : VARCHAR(100)
+    * recorded_at : TIMESTAMPTZ
+      duration_seconds : INTEGER
+      audio_url : TEXT
+    * status : ENUM {pending, transcribing, analyzing, completed, error}
+    * source : ENUM {plaud_sync, plaud_webhook, mobile_upload, manual}
+      summary : TEXT
+      location : JSONB
+      metadata : JSONB
+    --
+    * created_at : TIMESTAMPTZ
+      created_by : UUID <<FK users>>
+    * updated_at : TIMESTAMPTZ
+      updated_by : UUID <<FK users>>
+      deleted_at : TIMESTAMPTZ
+      deleted_by : UUID <<FK users>>
+  }
+
+  entity "transcripts" as trans {
+    * id : UUID <<PK>>
+    --
+    * recording_id : UUID <<FK recordings>> <<UNIQUE>>
+    * full_text : TEXT
+      segments : JSONB
+    * language : VARCHAR(10)
+      confidence : DECIMAL(4,3)
+      word_count : INTEGER
+    * provider : VARCHAR(50)
+    --
+    * created_at : TIMESTAMPTZ
+      created_by : UUID <<FK users>>
+    * updated_at : TIMESTAMPTZ
+      updated_by : UUID <<FK users>>
+      deleted_at : TIMESTAMPTZ
+      deleted_by : UUID <<FK users>>
+  }
+
+}
+
+' ============================================================
+' COMPLIANCE RULES
+' ============================================================
+
+package "Compliance" {
+
+  entity "rule_sets" as rsets {
+    * id : UUID <<PK>>
+    --
+    * org_id : UUID <<FK organizations>>
+    * name : VARCHAR(255)
+      description : TEXT
+    * is_active : BOOLEAN
+    --
+    * created_at : TIMESTAMPTZ
+      created_by : UUID <<FK users>>
+    * updated_at : TIMESTAMPTZ
+      updated_by : UUID <<FK users>>
+      deleted_at : TIMESTAMPTZ
+      deleted_by : UUID <<FK users>>
+  }
+
+  entity "rules" as rules_t {
+    * id : UUID <<PK>>
+    --
+    * rule_set_id : UUID <<FK rule_sets>>
+    * category : ENUM {profanity, competitor, misleading, prohibited_term, custom}
+    * severity : ENUM {low, medium, high, critical}
+    * match_type : ENUM {keyword, phrase, regex, semantic}
+    * match_value : TEXT
+      match_options : JSONB
+      description : TEXT
+    * is_active : BOOLEAN
+    --
+    * created_at : TIMESTAMPTZ
+      created_by : UUID <<FK users>>
+    * updated_at : TIMESTAMPTZ
+      updated_by : UUID <<FK users>>
+      deleted_at : TIMESTAMPTZ
+      deleted_by : UUID <<FK users>>
+  }
+
+}
+
+' ============================================================
+' FLAGS & AUDIT
+' ============================================================
+
+package "Flags & Audit" {
+
+  entity "flags" as flags {
+    * id : UUID <<PK>>
+    --
+    * recording_id : UUID <<FK recordings>>
+      rule_id : UUID <<FK rules>>
+    * org_id : UUID <<FK organizations>>
+    * rep_id : UUID <<FK users>>
+    * matched_text : TEXT
+    * context_snippet : TEXT
+    * severity : ENUM {low, medium, high, critical}
+    * status : ENUM {pending, under_review, confirmed, dismissed, escalated}
+      audio_url : TEXT
+      audio_start_ms : INTEGER
+      audio_end_ms : INTEGER
+      ai_verdict : ENUM {violation, not_violation}
+      ai_reasoning : TEXT
+      ai_confidence : DECIMAL(4,3)
+      ai_reviewed_at : TIMESTAMPTZ
+    * flagged_at : TIMESTAMPTZ
+    --
+    * created_at : TIMESTAMPTZ
+      created_by : UUID <<FK users>>
+    * updated_at : TIMESTAMPTZ
+      updated_by : UUID <<FK users>>
+      deleted_at : TIMESTAMPTZ
+      deleted_by : UUID <<FK users>>
+  }
+
+  entity "flag_acknowledgments" as flag_ack {
+    * id : UUID <<PK>>
+    --
+    * flag_id : UUID <<FK flags>>
+    * rep_id : UUID <<FK users>>
+    * explanation : TEXT
+    --
+    * created_at : TIMESTAMPTZ
+      created_by : UUID <<FK users>>
+    * updated_at : TIMESTAMPTZ
+      updated_by : UUID <<FK users>>
+      deleted_at : TIMESTAMPTZ
+      deleted_by : UUID <<FK users>>
+  }
+
+  entity "audit_reviews" as reviews {
+    * id : UUID <<PK>>
+    --
+    * flag_id : UUID <<FK flags>>
+    * reviewer_id : UUID <<FK users>>
+    * decision : ENUM {confirmed, dismissed, escalated}
+      notes : TEXT
+    * reviewed_at : TIMESTAMPTZ
+    --
+    * created_at : TIMESTAMPTZ
+      created_by : UUID <<FK users>>
+    * updated_at : TIMESTAMPTZ
+      updated_by : UUID <<FK users>>
+      deleted_at : TIMESTAMPTZ
+      deleted_by : UUID <<FK users>>
+  }
+
+}
+
+' ============================================================
+' TRAINING
+' ============================================================
+
+package "Training" {
+
+  entity "training_modules" as t_mod {
+    * id : UUID <<PK>>
+    --
+      org_id : UUID <<FK organizations>>
+    * title : VARCHAR(255)
+      description : TEXT
+      content_url : TEXT
+      category : VARCHAR(50)
+      duration_mins : INTEGER
+    * is_active : BOOLEAN
+    --
+    * created_at : TIMESTAMPTZ
+      created_by : UUID <<FK users>>
+    * updated_at : TIMESTAMPTZ
+      updated_by : UUID <<FK users>>
+      deleted_at : TIMESTAMPTZ
+      deleted_by : UUID <<FK users>>
+  }
+
+  entity "training_assignments" as t_assign {
+    * id : UUID <<PK>>
+    --
+    * org_id : UUID <<FK organizations>>
+    * rep_id : UUID <<FK users>>
+    * module_id : UUID <<FK training_modules>>
+      flag_id : UUID <<FK flags>>
+      assigned_by : UUID <<FK users>>
+    * status : ENUM {assigned, in_progress, completed, overdue}
+      due_date : DATE
+      completed_at : TIMESTAMPTZ
+    --
+    * created_at : TIMESTAMPTZ
+      created_by : UUID <<FK users>>
+    * updated_at : TIMESTAMPTZ
+      updated_by : UUID <<FK users>>
+      deleted_at : TIMESTAMPTZ
+      deleted_by : UUID <<FK users>>
+  }
+
+}
+
+' ============================================================
+' PITCHBOT
+' ============================================================
+
+package "Pitchbot" {
+
+  entity "pitch_scores" as pitch {
+    * id : UUID <<PK>>
+    --
+    * recording_id : UUID <<FK recordings>> <<UNIQUE>>
+    * org_id : UUID <<FK organizations>>
+    * rep_id : UUID <<FK users>>
+    * overall_score : DECIMAL(3,1)
+    * category_scores : JSONB
+      top_strength : VARCHAR(100)
+      focus_area : VARCHAR(100)
+      feedback_summary : TEXT
+      recommended_lesson : VARCHAR(255)
+    --
+    * created_at : TIMESTAMPTZ
+      created_by : UUID <<FK users>>
+    * updated_at : TIMESTAMPTZ
+      updated_by : UUID <<FK users>>
+      deleted_at : TIMESTAMPTZ
+      deleted_by : UUID <<FK users>>
+  }
+
+  entity "daily_coaching_summaries" as coaching {
+    * id : UUID <<PK>>
+    --
+    * org_id : UUID <<FK organizations>>
+    * rep_id : UUID <<FK users>>
+    * date : DATE
+    * recordings_count : INTEGER
+    * avg_overall_score : DECIMAL(3,1)
+    * avg_category_scores : JSONB
+      top_strength : VARCHAR(100)
+      focus_area : VARCHAR(100)
+      coaching_notes : TEXT
+    --
+    <<UNIQUE(rep_id, date)>>
+    --
+    * created_at : TIMESTAMPTZ
+      created_by : UUID <<FK users>>
+    * updated_at : TIMESTAMPTZ
+      updated_by : UUID <<FK users>>
+      deleted_at : TIMESTAMPTZ
+      deleted_by : UUID <<FK users>>
+  }
+
+}
+
+' ============================================================
+' OPERATIONAL
+' ============================================================
+
+package "Operational" {
+
+  entity "push_subscriptions" as push {
+    * id : UUID <<PK>>
+    --
+      user_id : UUID <<FK users>>
+    * endpoint : TEXT <<UNIQUE>>
+    * p256dh : TEXT
+    * auth : TEXT
+    * created_at : TIMESTAMPTZ
+  }
+
+  entity "cron_heartbeat" as cron {
+    * id : UUID <<PK>>
+    --
+    * cron_name : VARCHAR(100)
+    * started_at : TIMESTAMPTZ
+      finished_at : TIMESTAMPTZ
+    * status : VARCHAR(20)
+      result : JSONB
+      error_message : TEXT
+  }
+
+}
+
+' ============================================================
+' RELATIONSHIPS
+' ============================================================
+
+' Core → RBAC
+orgs ||--o{ roles
+orgs ||--o{ members
+users ||--o{ members
+roles ||--o{ role_perms
+roles ||--o{ members
+
+' Core → Plaud
+orgs ||--o{ devices
+orgs ||--o{ plaud_acc
+users ||--o{ devices
+users |o--o{ plaud_acc
+plaud_acc ||--o{ synced
+
+' Core → Recordings
+orgs ||--o{ recs
+users ||--o{ recs
+devices ||--o{ recs
+recs ||--|| trans
+
+' Core → Compliance
+orgs ||--o{ rsets
+rsets ||--o{ rules_t
+
+' Recordings → Flags
+recs ||--o{ flags
+rules_t ||--o{ flags
+flags ||--o{ flag_ack
+flags ||--o{ reviews
+users ||--o{ reviews
+
+' Core → Training
+orgs ||--o{ t_mod
+t_mod ||--o{ t_assign
+flags ||--o{ t_assign
+users ||--o{ t_assign
+
+' Core → Pitchbot
+recs ||--|| pitch
+orgs ||--o{ pitch
+users ||--o{ pitch
+orgs ||--o{ coaching
+users ||--o{ coaching
+
+' Core → Operational
+users ||--o{ push
+
+@enduml
